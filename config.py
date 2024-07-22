@@ -26,3 +26,4 @@ class DBConfig(BaseSettings):
 
 local_config = DBConfig(_env_file=f'{root_path}/settings_local.env')
 oc_config = DBConfig(_env_file=f'{root_path}/settings_oc.env')
+images_path = "/Volumes/Orico/images/"

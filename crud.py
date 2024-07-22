@@ -1,10 +1,12 @@
+import os
 from operator import itemgetter
 
-from sqlalchemy import insert, select, text, Table, Result
+from sqlalchemy import insert, select, text, Table, Result, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm.decl_api import DeclarativeAttributeIntercept
 
+from config import images_path
 from v_2_db.model import Base
 
 
@@ -57,3 +59,31 @@ async def check_links(session: AsyncSession, table: DeclarativeAttributeIntercep
     result = r.fetchall()
     return_result = list(map(itemgetter(0), result))
     return return_result
+
+
+async def get_product(session: AsyncSession, table: DeclarativeAttributeIntercept, id_: int) -> dict:
+    query = select(table.id,
+                   table.parent,
+                   table.title,
+                   table.title_full,
+                   table.code,
+                   table.link,
+                   table.price,
+                   table.properties,
+                   table.description_text,
+                   table.description_props,
+                   table.images).filter(table.id == id_)
+    r = await session.execute(query)
+    result = [row._mapping for row in r.fetchall()]
+    result_dict = dict(result[0])
+    return result_dict
+
+
+async def get_products_id(session: AsyncSession, table: DeclarativeAttributeIntercept) -> list:
+    folders = os.listdir(images_path)
+    folders.remove('.DS_Store')
+    folder_list = list(map(int, folders))
+    query = select(table.id).filter(and_(table.code != None), (table.code.not_in(folder_list)))
+    r = await session.execute(query)
+    result = list(map(itemgetter(0), r.fetchall()))
+    return result

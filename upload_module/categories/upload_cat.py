@@ -1,3 +1,6 @@
+from datetime import datetime
+
+from config import today
 from crud import get_data, truncate_tables, write_data, recursive_get_parent
 from engine import oc_engine, local_engine
 from upload_module import categories
@@ -12,14 +15,17 @@ async def upload_categories():
         await async_connect.run_sync(OCBase.metadata.create_all)
     async with local_engine.scoped_session() as local_session:
         r = await get_data(session=local_session, table=TriyaData, criteria=(TriyaData.price == None))
+
         for line in r:
             oc_category_result.append(
                 {'category_id': line.id,
                  'parent_id': line.parent,
-                 'top': 0,
+                 'top': 1,
                  'column': 1,
                  'sort_order': line.id,
-                 'status': 1}
+                 'status': 1,
+                 'date_added': today,
+                 'date_modified': today}
             )
             oc_category_desc.append(
                 {'category_id': line.id,

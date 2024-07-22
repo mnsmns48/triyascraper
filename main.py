@@ -16,7 +16,6 @@ async def main():
         await parsing_main(browser=browser)
     # await upload()
 
-
 if __name__ == "__main__":
     try:
         start = time.time()
