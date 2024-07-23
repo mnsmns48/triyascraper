@@ -7,5 +7,5 @@ from v_2_db.model import TriyaData
 
 
 async def upload():
-    await upload_categories()
+    # await upload_categories()
     await upload_products()
