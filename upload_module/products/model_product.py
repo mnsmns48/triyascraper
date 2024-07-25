@@ -67,7 +67,7 @@ class OCProductDesc(ProductBase):
 
 
 class OCProductCategory(ProductBase):
-    __tablename__ = 'oc_product_attribute'
+    __tablename__ = 'oc_product_to_category'
     product_id: Mapped[int] = mapped_column(primary_key=True)
     category_id: Mapped[int] = mapped_column(primary_key=True)
     main_category: Mapped[int] = mapped_column(TINYINT, default=0)

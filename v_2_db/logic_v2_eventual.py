@@ -1,25 +1,19 @@
-import asyncio
 import json
+import os
 from operator import itemgetter
-from typing import Tuple, Any, Sequence
+from typing import Sequence
 
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
-from sqlalchemy import select, and_, func, Table, Result, update, Row
+from sqlalchemy import select, and_, Result, update, Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.decl_api import DeclarativeAttributeIntercept
 
-from config import today
-from crud import write_data, get_product, get_products_id
+from config import today, images_path
+from crud import write_data, get_product, get_max_id
 from engine import db_start_sync, local_engine
 from upload_module.image_download import get_image
 from v_2_db.model import Base, TriyaData
-
-
-async def get_max_id(session: AsyncSession, table: DeclarativeAttributeIntercept) -> int:
-    result = await session.execute(select(func.max(table.id)))
-    r = result.one()
-    return int(r[0])
 
 
 async def parsing_main(browser: async_playwright):
@@ -30,37 +24,43 @@ async def parsing_main(browser: async_playwright):
     context = await browser.new_context()
     page = await context.new_page()
     async with local_engine.scoped_session() as local_session:
-        # query = select(TriyaData.id).filter(TriyaData.id == 1)
-        # r = await local_session.execute(query)
-        # result: Result = r.fetchall()
-        # if not result:
-        #     await write_data(session=local_session, table=TriyaData,
-        #                      data={'parsing_date': today, 'id': 1, 'title': 'Главное меню', 'parent': 0})
-        # main_menu = await processing_menu(db_session=local_session,
-        #                                   page=page,
-        #                                   transmitted_locator="xpath=//div[@class='divider-header']",
-        #                                   page_filter=filter_links)
-        #
-        # for sub_menu in main_menu:
-        #     sub_result = await processing_menu(db_session=local_session, page=page, sub_item=sub_menu,
-        #                                        transmitted_locator="xpath=//a[contains(@class, 'element')]"
-        #                                                            "[not(contains(@href, '/?model='))]",
-        #                                        page_filter=filter_links)
-        #     for sub_next_menu in sub_result:
-        #         _sub = await processing_menu(db_session=local_session, page=page,
-        #                                      sub_item=sub_menu,
-        #                                      next_sub=sub_next_menu,
-        #                                      transmitted_locator="xpath=//a[@class='tag']",
-        #                                      page_filter=filter_links)
-        # await add_products_flag(session=local_session, table=TriyaData)
-        # print('Menu structure is ready')
-        # links_with_products = await get_product_list(session=local_session, table=TriyaData)
-        # for link in links_with_products:
-        #     products = await pars_product_list_db(url=link.link, page=page, parent=link.id)
-        #     [await write_data(session=local_session,
-        #                       table=TriyaData,
-        #                       data=product_item) for product_item in products]
-        product_list_id = await get_products_id(session=local_session, table=TriyaData)
+        query = select(TriyaData.id).filter(TriyaData.id == 1)
+        r = await local_session.execute(query)
+        result: Result = r.fetchall()
+        if not result:
+            await write_data(session=local_session, table=TriyaData,
+                             data={'parsing_date': today, 'id': 1, 'title': 'Главное меню', 'parent': 0})
+        main_menu = await processing_menu(db_session=local_session,
+                                          page=page,
+                                          transmitted_locator="xpath=//div[@class='divider-header']",
+                                          page_filter=filter_links)
+
+        for sub_menu in main_menu:
+            sub_result = await processing_menu(db_session=local_session, page=page, sub_item=sub_menu,
+                                               transmitted_locator="xpath=//a[contains(@class, 'element')]"
+                                                                   "[not(contains(@href, '/?model='))]",
+                                               page_filter=filter_links)
+            for sub_next_menu in sub_result:
+                _sub = await processing_menu(db_session=local_session, page=page,
+                                             sub_item=sub_menu,
+                                             next_sub=sub_next_menu,
+                                             transmitted_locator="xpath=//a[@class='tag']",
+                                             page_filter=filter_links)
+        await add_products_flag(session=local_session, table=TriyaData)
+        print('Menu structure is ready')
+        links_with_products = await get_product_list(session=local_session, table=TriyaData)
+        for link in links_with_products:
+            products = await pars_product_list_db(url=link.link, page=page, parent=link.id)
+            [await write_data(session=local_session,
+                              table=TriyaData,
+                              data=product_item) for product_item in products]
+        #  D O W N L O A D   I M A G E S #
+        folders = os.listdir(images_path)
+        folders.remove('.DS_Store')
+        folder_list = list(map(int, folders))
+        query = select(TriyaData.id).filter(and_(TriyaData.code != None), (TriyaData.code.not_in(folder_list)))
+        r = await local_session.execute(query)
+        product_list_id = list(map(itemgetter(0), r.fetchall()))
         c = len(product_list_id)
         for id_ in product_list_id:
             product = await get_product(session=local_session, table=TriyaData, id_=id_)
@@ -82,7 +82,7 @@ async def processing_menu(db_session: AsyncSession,
         await page.goto(url='https://www.triya.ru/catalog/', wait_until='domcontentloaded')
         menu = await page.locator(transmitted_locator).all()
     else:
-        id_ = await get_max_id(session=db_session, table=TriyaData) + 1
+        id_ = await get_max_id(session=db_session, column=TriyaData.id) + 1
         if sub_item and not next_sub:
             parent = sub_item.get('id')
             await page.goto(url=sub_item.get('link'), wait_until='domcontentloaded')

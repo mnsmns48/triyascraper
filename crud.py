@@ -1,7 +1,8 @@
+import asyncio
 import os
 from operator import itemgetter
 
-from sqlalchemy import insert, select, text, Table, Result, and_
+from sqlalchemy import insert, select, text, Table, Result, and_, update, func, Column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm.decl_api import DeclarativeAttributeIntercept
@@ -79,11 +80,90 @@ async def get_product(session: AsyncSession, table: DeclarativeAttributeIntercep
     return result_dict
 
 
-async def get_products_id(session: AsyncSession, table: DeclarativeAttributeIntercept) -> list:
-    folders = os.listdir(images_path)
-    folders.remove('.DS_Store')
-    folder_list = list(map(int, folders))
-    query = select(table.id).filter(and_(table.code != None), (table.code.not_in(folder_list)))
+async def get_products_id(session: AsyncSession, table: DeclarativeAttributeIntercept, limit: int | None) -> list:
+    query = select(table.id).filter(table.code != None).limit(limit)
     r = await session.execute(query)
     result = list(map(itemgetter(0), r.fetchall()))
     return result
+
+
+async def update_attr_groups(session: AsyncSession,
+                             attr_table_desc: DeclarativeAttributeIntercept,
+                             attr_table: DeclarativeAttributeIntercept,
+                             group_attr: list) -> dict:
+    query = select(attr_table_desc.attribute_group_id,
+                   attr_table_desc.name).filter(attr_table_desc.name.in_(group_attr))
+    r = await session.execute(query)
+    result = [row._mapping for row in r.fetchall()]
+    result_dict = dict()
+    if len(result) == len(group_attr):
+        for line in result:
+            result_dict.update({line.get('name'): line.get('attribute_group_id')})
+        return result_dict
+    else:
+        for line in result:
+            group_attr.remove(line.get('name'))
+        to_add_desc = list()
+        to_add_ = list()
+        attribute_group_id = await get_max_id(session=session, column=attr_table_desc.attribute_group_id)
+        for attr in group_attr:
+            to_add_desc.append({'attribute_group_id': attribute_group_id + 1,
+                                'language_id': 1,
+                                'name': attr})
+            to_add_.append({'attribute_group_id': attribute_group_id + 1,
+                            'sort_order': attribute_group_id + 1})
+            attribute_group_id += 1
+        stmt = insert(attr_table_desc).values(to_add_desc)
+        await session.execute(stmt)
+        stmt2 = insert(attr_table).values(to_add_)
+        await session.execute(stmt2)
+        to_add_desc.extend(result)
+        for line in to_add_desc:
+            result_dict.update({line.get('name'): line.get('attribute_group_id')})
+        return result_dict
+
+
+async def update_attr(session: AsyncSession,
+                      table_desc: DeclarativeAttributeIntercept,
+                      table: DeclarativeAttributeIntercept,
+                      props: dict) -> dict:
+    to_desc = list()
+    to_attr = list()
+    result_dict = dict()
+    attribute_id = await get_max_id(session=session, column=table_desc.attribute_id)
+    for key, value in props.items():
+        query = select(table_desc.attribute_id,
+                       table_desc.name).filter(table_desc.name.in_(value))
+        r = await session.execute(query)
+        result = [row._mapping for row in r.fetchall()]
+        if len(value) == len(result):
+            [result_dict.update({line.get('name'): line.get('attribute_id')}) for line in result]
+        else:
+            for line in result:
+                value.remove(line.get('name'))
+            for attr in value:
+                to_desc.append({'attribute_id': attribute_id + 1,
+                                'language_id': 1,
+                                'name': attr
+                                })
+                to_attr.append({'attribute_id': attribute_id + 1,
+                                'sort_order': attribute_id + 1,
+                                'attribute_group_id': key})
+                attribute_id += 1
+            await asyncio.sleep(0.5)
+            stmt = insert(table_desc).values(to_desc)
+            await session.execute(stmt)
+            stmt2 = insert(table).values(to_attr)
+            await session.execute(stmt2)
+            for line in to_attr:
+                result_dict.update({line.get('name'): line.get('attribute_id')})
+    return result_dict
+
+
+async def get_max_id(session: AsyncSession, column: Column) -> int:
+    result = await session.execute(select(func.max(column)))
+    r = result.one()
+    if r[0] is not None:
+        return int(r[0])
+    else:
+        return 0

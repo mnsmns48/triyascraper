@@ -11,10 +11,10 @@ from v_2_db.logic_v2_eventual import parsing_main
 
 async def main():
     print('Начало работы')
-    async with async_playwright() as playwright:
-        browser = await run_browser(playwright=playwright)
-        await parsing_main(browser=browser)
-    # await upload()
+    # async with async_playwright() as playwright:
+    #     browser = await run_browser(playwright=playwright)
+    #     await parsing_main(browser=browser)
+    await upload()
 
 if __name__ == "__main__":
     try:
