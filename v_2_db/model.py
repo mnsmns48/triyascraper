@@ -17,7 +17,7 @@ class Base(DeclarativeBase):
 
 
 class TriyaData(Base):
-    __tablename__ = 'triyadata'
+    __tablename__ = 'triyadata_2'
     parsing_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False))
     id: Mapped[int] = mapped_column(primary_key=True, unique=True)
     parent: Mapped[int]

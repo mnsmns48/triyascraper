@@ -7,6 +7,7 @@ from playwright.async_api import async_playwright
 from config import run_browser
 from upload_module.logic_upload import upload
 from v_2_db.logic_v2_eventual import parsing_main
+from qq import t_t
 
 
 async def main():
@@ -15,6 +16,8 @@ async def main():
     #     browser = await run_browser(playwright=playwright)
     #     await parsing_main(browser=browser)
     await upload()
+    # await t_t()
+
 
 if __name__ == "__main__":
     try:

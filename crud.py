@@ -130,7 +130,6 @@ async def update_attr(session: AsyncSession,
     to_desc = list()
     to_attr = list()
     result_dict = dict()
-    attribute_id = await get_max_id(session=session, column=table_desc.attribute_id)
     for key, value in props.items():
         query = select(table_desc.attribute_id,
                        table_desc.name).filter(table_desc.name.in_(value))
@@ -139,6 +138,7 @@ async def update_attr(session: AsyncSession,
         if len(value) == len(result):
             [result_dict.update({line.get('name'): line.get('attribute_id')}) for line in result]
         else:
+            attribute_id = await get_max_id(session=session, column=table_desc.attribute_id)
             for line in result:
                 value.remove(line.get('name'))
             for attr in value:
@@ -163,7 +163,7 @@ async def update_attr(session: AsyncSession,
 async def get_max_id(session: AsyncSession, column: Column) -> int:
     result = await session.execute(select(func.max(column)))
     r = result.one()
-    if r[0] is not None:
+    if r[0]:
         return int(r[0])
     else:
-        return 0
+        return 1

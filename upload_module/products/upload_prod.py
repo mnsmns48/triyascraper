@@ -3,19 +3,22 @@ import json
 import random
 
 from config import today
-from crud import check_links, get_products_id, get_product, update_attr_groups, update_attr, truncate_tables, write_data
+from crud import get_products_id, get_product, update_attr_groups, update_attr, truncate_tables, \
+    write_data, recursive_get_parent
 from engine import local_engine, oc_engine
 from upload_module import products, OCProduct, OCProductDesc, OCProductCategory, OCProductStore, OCProductLayout, \
     OCProductAttr
 from upload_module.attributes import OCAttrGroupDesc, OCAttrGroup, OCAttr, OCAttrDesc
+from upload_module.func import json_to_text
 from v_2_db.model import TriyaData
 
 
 async def upload_products():
     async with oc_engine.scoped_session() as oc_session:
-        # await truncate_tables(session=oc_session, tables=products.__all__)
+        await truncate_tables(session=oc_session, tables=products.__all__)
+        await asyncio.sleep(1)
         async with local_engine.scoped_session() as local_session:
-            products_id = await get_products_id(session=local_session, table=TriyaData, limit=1)
+            products_id = await get_products_id(session=local_session, table=TriyaData, limit=None)
             for id_ in products_id:
                 product_dict = await get_product(session=local_session, table=TriyaData, id_=id_)
                 if product_dict.get('properties'):
@@ -67,21 +70,25 @@ async def upload_products():
                     'date_added': today,
                     'date_modified': today
                 }
+                desc_props = await json_to_text(json_data=product_dict.get('description_props'))
                 oc_product_description = {
                     'product_id': product_dict.get('code'),
                     'language_id': 1,
                     'name': product_dict.get('title_full'),
-                    'description': product_dict.get('description_text'),
+                    'description': f"{product_dict.get('description_text')}\n{desc_props}",
                     'tag': '',
                     'meta_title': '',
                     'meta_h1': '',
                     'meta_description': '',
                     'meta_keyword': ''
                 }
+                main_category = await recursive_get_parent(session=local_session,
+                                                           table=TriyaData.__tablename__,
+                                                           id_=product_dict.get('id'))
                 oc_product_category = {
                     'product_id': product_dict.get('code'),
                     'category_id': product_dict.get('parent'),
-                    'main_category': 2
+                    'main_category': main_category.get('path_id')
                 }
                 oc_product_store = {
                     'product_id': product_dict.get('code'),
@@ -102,9 +109,11 @@ async def upload_products():
                             'language_id': 1,
                             'text': p.get(k)})
                 sort += 1
+                await write_data(session=oc_session, table=OCProductAttr, data=oc_product_attribute)
                 await write_data(session=oc_session, table=OCProduct, data=oc_product)
                 await write_data(session=oc_session, table=OCProductDesc, data=oc_product_description)
                 await write_data(session=oc_session, table=OCProductCategory, data=oc_product_category)
                 await write_data(session=oc_session, table=OCProductStore, data=oc_product_store)
                 await write_data(session=oc_session, table=OCProductLayout, data=oc_product_layout)
-                await write_data(session=oc_session, table=OCProductAttr, data=oc_product_attribute)
+                await asyncio.sleep(1)
+                print(product_dict.get('title'), 'added')

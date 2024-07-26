@@ -12,7 +12,7 @@ from sqlalchemy.orm.decl_api import DeclarativeAttributeIntercept
 from config import today, images_path
 from crud import write_data, get_product, get_max_id
 from engine import db_start_sync, local_engine
-from upload_module.image_download import get_image
+from upload_module.func import get_image
 from v_2_db.model import Base, TriyaData
 
 
@@ -55,18 +55,18 @@ async def parsing_main(browser: async_playwright):
                               table=TriyaData,
                               data=product_item) for product_item in products]
         #  D O W N L O A D   I M A G E S #
-        folders = os.listdir(images_path)
-        folders.remove('.DS_Store')
-        folder_list = list(map(int, folders))
-        query = select(TriyaData.id).filter(and_(TriyaData.code != None), (TriyaData.code.not_in(folder_list)))
-        r = await local_session.execute(query)
-        product_list_id = list(map(itemgetter(0), r.fetchall()))
-        c = len(product_list_id)
-        for id_ in product_list_id:
-            product = await get_product(session=local_session, table=TriyaData, id_=id_)
-            await get_image(product=product, page=page)
-            c -= 1
-            print(id_, c)
+        # folders = os.listdir(images_path)
+        # folders.remove('.DS_Store')
+        # folder_list = list(map(int, folders))
+        # query = select(TriyaData.id).filter(and_(TriyaData.code != None), (TriyaData.code.not_in(folder_list)))
+        # r = await local_session.execute(query)
+        # product_list_id = list(map(itemgetter(0), r.fetchall()))
+        # c = len(product_list_id)
+        # for id_ in product_list_id:
+        #     product = await get_product(session=local_session, table=TriyaData, id_=id_)
+        #     await get_image(product=product, page=page)
+        #     c -= 1
+        #     print(id_, c)
 
 
 async def processing_menu(db_session: AsyncSession,
@@ -202,7 +202,7 @@ async def process_bs4_db(product_list: str, page: async_playwright, **kwargs) ->
                 props_list = list()
                 for prop in props:
                     prop_name = prop.find('span', {'class': 'name'}).text
-                    prop_value = prop.contents[-1].text.strip().replace(' ', '')
+                    prop_value = prop.contents[-1].text.strip() #.replace(' ', '')
                     props_list.append({prop_name: prop_value})
                 properties.update({prop_bold: props_list})
             product.update({'properties': json.dumps(properties, indent=2, ensure_ascii=False)})
